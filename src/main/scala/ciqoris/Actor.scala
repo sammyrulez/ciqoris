@@ -4,7 +4,7 @@ package ciqoris
 import akka.actor.{Props, Actor}
 import akka.pattern.ask
 import akka.util.Timeout
-import scala.concurrent.{Await, ExecutionContext}
+import scala.concurrent.{Await}
 import scala.concurrent.duration._
 
 
@@ -18,7 +18,7 @@ class DummyCommandValidator extends CommandValidator[Any] {
 
 case class CommandHandler[T](val command: Command[T])
 
-class CommandValidatingActor(val validators:List[CommandValidator[_]] )extends Actor {
+class CommandValidatingActor(val validators:List[CommandValidator[_]] )extends Actor  with Logging{
 
   def findValidator(command: Command[_]): CommandValidator[_] = {
     val filtered: List[CommandValidator[_]] = validators.filter(validator => validator.acceptCommand(command))
@@ -31,46 +31,46 @@ class CommandValidatingActor(val validators:List[CommandValidator[_]] )extends A
 
   override def receive: Receive = {
     case CommandHandler(command) => {
-      println("CommandValidatingActor: " + command.name)
+      logInfo("CommandValidatingActor: " + command.name)
 
       val validator: CommandValidator[_] = findValidator(command)
 
       sender ! validator.asInstanceOf[CommandValidator[Any]].validate(command)
     }
     case _ =>{
-      println("CommandValidatingActor wrong message " )
+      logError("CommandValidatingActor wrong message " )
     }
   }
 }
 
-class ActionExecutingActor(val executor:CommandExecutor[_])extends Actor{
+class ActionExecutingActor(val executor:CommandExecutor[_])extends Actor with Logging{
 
 
 
   override def receive: Actor.Receive = {
 
     case CommandHandler(command) => {
-      println("ActionExecutingActor: " + command.name + " with executor " + executor.toString)
+      logInfo("ActionExecutingActor: " + command.name + " with executor " + executor.toString)
       executor.asInstanceOf[CommandExecutor[Any]].execute(command)
 
     }
 
     case _ =>{
-      println("ActionExecutingActor  wrong message " )
+      logError("ActionExecutingActor  wrong message " )
     }
   }
 }
 
-class CommandExecutingActor(val executors:List[CommandExecutor[_]])extends Actor{
+class CommandExecutingActor(val executors:List[CommandExecutor[_]])extends Actor with Logging{
 
 
 
   override def receive: Actor.Receive = {
 
     case CommandHandler(command) => {
-      println("CommandExecutingActor: " + command.name )
+      logInfo("CommandExecutingActor: " + command.name )
       val filtered = executors.filter(exec => exec.acceptCommand(command))
-      println("found : " + filtered.size + " suitable executors")
+      logInfo("found : " + filtered.size + " suitable executors")
       val commandHandler = new CommandHandler(command)
       filtered.foreach(exec => {
         val executingProps: Props = Props(classOf[ActionExecutingActor],exec)
@@ -82,18 +82,18 @@ class CommandExecutingActor(val executors:List[CommandExecutor[_]])extends Actor
     }
 
     case _ =>{
-      println("CommandExecutingActor  wrong message " )
+      logError("CommandExecutingActor  wrong message " )
     }
   }
 }
 
-class CommandPersistActor(val executors:List[CommandExecutor[_]]) extends Actor {
+class CommandPersistActor(val executors:List[CommandExecutor[_]]) extends Actor with Logging {
 
 
 
   override def receive: Actor.Receive = {
     case CommandHandler(command) => {
-      println("Persisting: " + command.name)
+      logInfo("Persisting: " + command.name)
 
       val executingProps: Props = Props(classOf[CommandExecutingActor],executors)
       val execActor =context.actorOf(executingProps)
@@ -103,13 +103,13 @@ class CommandPersistActor(val executors:List[CommandExecutor[_]]) extends Actor 
     }
 
     case _ =>{
-      println("CommandPersistActor  wrong message " )
+      logError("CommandPersistActor  wrong message " )
     }
   }
 }
 
 
-class CommandHandlerActor(val validators:List[CommandValidator[_]],val executors:List[CommandExecutor[_]]) extends Actor{
+class CommandHandlerActor(val validators:List[CommandValidator[_]],val executors:List[CommandExecutor[_]]) extends Actor with Logging{
 
 
 
@@ -120,7 +120,7 @@ class CommandHandlerActor(val validators:List[CommandValidator[_]],val executors
   override def receive: Actor.Receive = {
 
     case CommandHandler(command) => {
-      println("Evaluating : "  + command.name)
+      logInfo("Evaluating : "  + command.name)
       val validatingActor =context.actorOf(validatingProps)
       implicit val timeout = Timeout(5 seconds)
       val future = validatingActor ? new CommandHandler(command)
