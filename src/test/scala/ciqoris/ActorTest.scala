@@ -26,10 +26,17 @@ with StopSystemAfterAll {
   val diModule: Module with Object = new Module {
     bind[ActorSystem] to system
 
+    //binding identifiedBy 'host and 'google to "www.google.com"
+
+    val validators: List[CommandValidator[_]] = List(new DummyCommandValidator())
+    val commandExecutor: DummyCommandExecutor = new DummyCommandExecutor("empty")
+    val executors: List[CommandExecutor[_]] = List(commandExecutor)
+
     binding toProvider new CommandHandlerActor
-    binding toProvider new CommandValidatingActor(List())
-    binding toProvider new CommandPersistActor(List())
-    binding toProvider new CommandExecutingActor(List())
+    binding toProvider new CommandValidatingActor(validators)
+    binding toProvider new CommandPersistActor()
+    binding toProvider new CommandExecutingActor(executors)
+
 
   }
 

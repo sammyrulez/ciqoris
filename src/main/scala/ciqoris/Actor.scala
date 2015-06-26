@@ -63,7 +63,7 @@ class ActionExecutingActor(val executor:CommandExecutor[_])extends Actor with Lo
   }
 }
 
-class CommandExecutingActor(val executors:List[CommandExecutor[_]])extends Actor with Logging{
+class CommandExecutingActor(val executors: List[CommandExecutor[_]])(implicit inj: Injector) extends Actor with Logging {
 
 
 
@@ -89,7 +89,7 @@ class CommandExecutingActor(val executors:List[CommandExecutor[_]])extends Actor
   }
 }
 
-class CommandPersistActor(val executors:List[CommandExecutor[_]]) extends Actor with Logging {
+class CommandPersistActor(implicit inj: Injector) extends Actor with Logging {
 
 
 
@@ -97,8 +97,8 @@ class CommandPersistActor(val executors:List[CommandExecutor[_]]) extends Actor 
     case CommandHandler(command) => {
       logInfo("Persisting: " + command.name)
 
-      val executingProps: Props = Props(classOf[CommandExecutingActor],executors)
-      val execActor =context.actorOf(executingProps)
+
+      val execActor = injectActorRef[CommandExecutingActor]
       execActor ! new CommandHandler(command)
 
 
