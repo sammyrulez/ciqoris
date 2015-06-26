@@ -10,13 +10,7 @@ import scala.concurrent.duration._
 import scaldi.akka.AkkaInjectable._
 
 
-class DummyCommandValidator extends CommandValidator[Any] {
-  override def validate(command: Command[Any]): Either[String, String] = Right("ok")
 
-  override def acceptCommand(command: Command[_]): Boolean = {
-    true
-  }
-}
 
 
 case class CommandHandler[T](val command: Command[T])
@@ -27,7 +21,7 @@ class CommandValidatingActor(val validators: List[CommandValidator[_]]) extends 
     val filtered: List[CommandValidator[_]] = validators.filter(validator => validator.acceptCommand(command))
     filtered.size match {
       case 1 => filtered.head
-      case 0 => new DummyCommandValidator()
+      case 0 => new BypassCommandValidator()
       case _ => throw new RuntimeException("More than one validator for command " + command.name + " : " + filtered.toString)
     }
   }
@@ -113,7 +107,7 @@ class CommandHandlerActor(implicit inj: Injector) extends Actor with Logging {
       val validatingActor = injectActorRef[CommandValidatingActor]
       implicit val timeout = Timeout(5 seconds)
       val future = validatingActor ? new CommandHandler(command)
-      val result: Either[String, String] = Await.result(future, timeout.duration).asInstanceOf[Either[String, String]]
+      val result: Either[List[Error], String] = Await.result(future, timeout.duration).asInstanceOf[Either[List[Error], String]]
       result match {
         case Right(out) => {
           val persistActor = injectActorRef[CommandPersistActor]
@@ -121,7 +115,7 @@ class CommandHandlerActor(implicit inj: Injector) extends Actor with Logging {
 
         }
         case Left(error) => {
-          logWarn(error)
+          logWarn(error.toString())
         }
       }
       sender ! result

@@ -43,17 +43,8 @@ with StopSystemAfterAll {
   "An CommandHandlerActor" must {
     "Handle commands" in {
       implicit val timeout = Timeout(5 seconds)
-      //implicit val system = inject [ActorSystem]
       implicit val ec = system.dispatcher
-
-      val validators:List[CommandValidator[_]] = List(new DummyCommandValidator())
-      val commandExecutor: DummyCommandExecutor = new DummyCommandExecutor("empty")
-      val executors:List[CommandExecutor[_]] = List(commandExecutor)
-
-
       implicit val appModule: Injector = diModule
-
-      //val handlerProps = Props(classOf[CommandHandlerActor],validators,executors)
       val commandActor = injectActorRef[CommandHandlerActor]
       val future = commandActor ? new CommandHandler[String](new Command[String]("task","tast","payload"))
       future.onComplete {
@@ -62,6 +53,22 @@ with StopSystemAfterAll {
       }
 
       Await.ready(future, timeout.duration)
+
+    }
+
+    "Handle validation errors" in {
+      implicit val timeout = Timeout(5 seconds)
+      implicit val ec = system.dispatcher
+      implicit val appModule: Injector = diModule
+      val commandActor = injectActorRef[CommandHandlerActor]
+      val future = commandActor ? new CommandHandler[String](new Command[String]("task", "tast", "wrong"))
+      future.onComplete {
+        case Failure(_) => fail()
+        case Success(msg) => println(msg)
+      }
+
+      Await.ready(future, timeout.duration)
+
 
     }
   }

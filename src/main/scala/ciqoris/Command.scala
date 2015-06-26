@@ -15,11 +15,7 @@ trait CommandReciver{
 
 }
 
-trait CommandValidator[T ] extends CommandReciver{
 
-  def validate(command:Command[T ]):Either[String,String]
-
-}
 
 trait CommandExecutor[T]extends CommandReciver{
 
