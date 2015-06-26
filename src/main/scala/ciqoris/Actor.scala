@@ -4,8 +4,10 @@ package ciqoris
 import akka.actor.{Props, Actor}
 import akka.pattern.ask
 import akka.util.Timeout
+import scaldi.Injector
 import scala.concurrent.{Await}
 import scala.concurrent.duration._
+import scaldi.akka.AkkaInjectable._
 
 
 
@@ -109,25 +111,24 @@ class CommandPersistActor(val executors:List[CommandExecutor[_]]) extends Actor 
 }
 
 
-class CommandHandlerActor(val validators:List[CommandValidator[_]],val executors:List[CommandExecutor[_]]) extends Actor with Logging{
+class CommandHandlerActor(implicit inj: Injector) extends Actor with Logging {
 
 
+  //val validatingProps: Props =
 
-  val validatingProps: Props = Props(classOf[CommandValidatingActor],validators)
-
-  val eventPersistProps:Props = Props(classOf[CommandPersistActor],executors)
+  // val eventPersistProps:Props = Props(classOf[CommandPersistActor],executors)
 
   override def receive: Actor.Receive = {
 
     case CommandHandler(command) => {
       logInfo("Evaluating : "  + command.name)
-      val validatingActor =context.actorOf(validatingProps)
+      val validatingActor = injectActorRef[CommandValidatingActor]
       implicit val timeout = Timeout(5 seconds)
       val future = validatingActor ? new CommandHandler(command)
       val result:Either[String,String] = Await.result(future, timeout.duration).asInstanceOf[Either[String,String]]
       result match {
         case Right(out) => {
-          val persistActor = context.actorOf(eventPersistProps)
+          val persistActor = injectActorRef[CommandPersistActor]
           persistActor ! new CommandHandler(command)
 
         }
